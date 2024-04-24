@@ -42,9 +42,8 @@ end)
 function commands(commandsObject)
     setmetatable(commandsObject, 
     {
-        __index = function()
-            return {argsNum = 0, action = function() end}
-        end,
+        argsNum = 0,
+        action = function() end,
         getArgumentsNumber = function(self)
             return self.argsNum
         end
