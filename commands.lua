@@ -1,7 +1,9 @@
 print("hello  from server")
 
+-- The pattern the commands should start with / it can have a len != than 1
 local commandStartPattern = "!"
 
+-- Define commands here
 local commandsTable = {
     ["kill"] = {
         argsNum = 1,
@@ -23,6 +25,7 @@ local commandsTable = {
     }
 }
 
+-- hook to handle user chat message event
 hook.Add("PlayerSay", "InterpretChatCommands", function(ply, msg,_b)
     msg = string.Trim(msg)
 
@@ -71,10 +74,10 @@ function splitCommand(chatMsg)
     local argsString = nil
 
     if posSpace == nil then
-        command_name = string.sub(chatMsg, 2)
+        command_name = string.sub(chatMsg, string.len(commandStartPattern) + 1)
         argsString = ""
     else
-        command_name = string.sub(chatMsg, 2, posSpace - 1)
+        command_name = string.sub(chatMsg, string.len(commandStartPattern) + 1, posSpace - 1)
         argsString = string.TrimLeft(string.sub(chatMsg, posSpace, string.len(chatMsg)), " ")
     end
 
