@@ -2,48 +2,56 @@ print("hello  from server")
 
 local commandStartPattern = "!"
 
--- it is the max number of args
-local commandsArgumentsNumber = {    
-    ["kill"] = 1
+local commandsTable = {
+    ["kill"] = {
+        argsNum = 1,
+        action = function(ply, args, rest)
+            local targetName = args[1]
+            if targetName == nil then
+                ply:Kill()
+            else 
+                local players = player.GetHumans()
+                
+                for i, plyer in ipairs(players) do
+                    if plyer:GetName() == targetName then
+                        plyer:Kill()
+                    end
+                end
+            end
+        end
+    }
 }
 
-setmetatable(commandsArgumentsNumber, 
-{
-    __index = function()
-        return 0
-    end
-})
-
-hook.Add("PlayerSay", "InterpretChatCommands", function(ply, msg,c)
+hook.Add("PlayerSay", "InterpretChatCommands", function(ply, msg,_b)
     msg = string.Trim(msg)
-    
-    print("msg="..msg)
+
     if string.len(msg) <= 1 or not string.StartsWith(msg, commandStartPattern) then
         return
     end
 
     local isPlayerAdmin = ply:IsAdmin()
-    print("isadmin=".. tostring(isPlayerAdmin))
+    local commands = commands(commandsTable)
 
     local name, argsString = splitCommand(msg)
-    local numberOfArgs = commandsArgumentsNumber[name]
-    local args, rest = getArgs(argsString, numberOfArgs)
+    local command = commands[name];
     
-    if name == "kill" then
-        local targetName = args[1]
-        if targetName == nil then
-            ply:Kill()
-        else 
-            local players = player.GetHumans()
-            
-            for i, plyer in ipairs(players) do
-                if plyer:GetName() == targetName then
-                    plyer:Kill()
-                end
-            end
-        end
-    end
+    command.action(ply, ...getArgs(argsString, command:getArgumentsNumber()))
 end)
+
+-- Setup Commands with an object as displayed up there
+function commands(commandsObject)
+    setmetatable(commandsObject, 
+    {
+        __index = function()
+            return {argsNum = 0, action = function() end}
+        end,
+        getArgumentsNumber = function(self)
+            return self.argsNum
+        end
+    })
+
+    return commandsObject
+end
 
 -- here chatMsg is sure to be a command starting with "!"
 -- Returns a name String and arguments String
