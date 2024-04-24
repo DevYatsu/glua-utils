@@ -15,6 +15,7 @@ local commandsTable = {
                 for i, plyer in ipairs(players) do
                     if plyer:GetName() == targetName then
                         plyer:Kill()
+                        break 
                     end
                 end
             end
@@ -31,21 +32,29 @@ hook.Add("PlayerSay", "InterpretChatCommands", function(ply, msg,_b)
 
     local isPlayerAdmin = ply:IsAdmin()
     local commands = commands(commandsTable)
-
-    local name, argsString = splitCommand(msg)
-    local command = commands[name];
+    local command, argsString = commands:fromMsg(msg)
     
-    command.action(ply, ...getArgs(argsString, command:getArgumentsNumber()))
+    command.action(ply, ...command:getArgs(argsString))
 end)
 
 -- Setup Commands with an object as displayed up there
 function commands(commandsObject)
     setmetatable(commandsObject, 
     {
-        argsNum = 0,
-        action = function() end,
-        getArgumentsNumber = function(self)
-            return self.argsNum
+        __index = {
+            argsNum = 0,
+            action = function(ply, args, rest) end,
+            getArgumentsNumber = function(self)
+                return self.argsNum
+            end, 
+            getArgs = function(self, argsString)
+                return getArgs(argsString, self:getArgumentsNumber())
+            end,
+        },
+        fromMsg = function(self, msg)
+            local name, argsString = splitCommand(msg)
+
+            return self[name], argsString
         end
     })
 
