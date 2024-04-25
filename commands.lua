@@ -1,5 +1,3 @@
-print("hello  from server")
-
 -- Commands are parsed with a simple pattern:
 -- <commandStartPattern><commandName> [<arg>] [<arg>] "<arg with spaces>" ...
 
@@ -12,6 +10,7 @@ local commandStartPattern = "!"
 local commandsTable = {
     ["kill"] = {
         argsNum = 1,
+        requiresAdmin = true,
         action = function(ply, args, rest)
             local targetName = args[1]
             if targetName == nil then
@@ -27,6 +26,17 @@ local commandsTable = {
                 end
             end
         end
+    },
+    ["echo"] = {
+        argsNum = 0,
+        action = function(ply, args, rest)
+            util.AddNetworkString("EchoCommand")
+            // send to the client the message in order to echo it
+            // then on the client side we should manage the connexion
+            net.Start("EchoCommand")
+            net.WriteString(rest)
+            net.Send(ply)
+        end
     }
 }
 
@@ -38,11 +48,9 @@ hook.Add("PlayerSay", "InterpretChatCommands", function(ply, msg,_b)
         return
     end
 
-    local isPlayerAdmin = ply:IsAdmin()
     local commands = commands(commandsTable)
-    local command, argsString = commands:fromMsg(msg)
-    
-    command.action(ply, ...command:getArgs(argsString))
+
+    commands:call(ply, msg)
 end)
 
 -- Setup Commands with an object as displayed up there
@@ -50,20 +58,28 @@ function commands(commandsObject)
     setmetatable(commandsObject, 
     {
         __index = {
-            argsNum = 0,
-            action = function(ply, args, rest) end,
-            getArgumentsNumber = function(self)
-                return self.argsNum
-            end, 
-            getArgs = function(self, argsString)
-                return getArgs(argsString, self:getArgumentsNumber())
-            end,
-        },
-        fromMsg = function(self, msg)
-            local name, argsString = splitCommand(msg)
+            commandFromMsg = function(self, msg)
+                local name, argsString = splitCommand(msg)
 
-            return self[name], argsString
-        end
+                return self[name], argsString
+            end,
+            call = function(self, ply, msg)
+                local command, argsString = self:commandFromMsg(msg)
+
+                if not command then
+                    return
+                end
+
+                local numberOfArgs = command.argsNum and command.argsNum or 0
+                local args, rest = getArgs(argsString, numberOfArgs)
+
+                if command.requiresAdmin and not ply:IsAdmin() then
+                    return
+                end
+
+                return command.action(ply, args, rest)
+            end,
+        }
     })
 
     return commandsObject
@@ -95,7 +111,11 @@ end
 function getArgs(argsString, number)
     local args = {}
     local rest = argsString
-    
+
+    if string.len(string.Trim(argsString)) == 0 then
+        return args, rest
+    end
+
     for i = 1, number do
         local quotedArg = rest:match("^%b\"\"")
         local unquotedArg = rest:match("^%S+")
