@@ -1,6 +1,6 @@
 -- Commands are parsed with a simple pattern:
 -- <commandStartPattern><commandName> [<arg>] [<arg>] "<arg with spaces>" ...
-print("working as expected")
+
 -- The allowed commands are listed inside of the `commandsTable` table.
 
 -- The pattern defining the commands should start with / it can have a len != than 1
