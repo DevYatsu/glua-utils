@@ -1,41 +1,94 @@
 -- Commands are parsed with a simple pattern:
 -- <commandStartPattern><commandName> [<arg>] [<arg>] "<arg with spaces>" ...
-
+print("working as expected")
 -- The allowed commands are listed inside of the `commandsTable` table.
 
 -- The pattern defining the commands should start with / it can have a len != than 1
 local commandStartPattern = "!"
 
+-- if a player has the exact argument name then it is returned alone
+-- otherwise a list of players with the name starting by the argument is returned
+-- if no player is matched an empty list is returned
+local function getPlayersByName(name)
+    name = string.lower(name)
+    local allPlayers = player.GetHumans()
+
+    local plyers = {}
+
+    for i, plyer in ipairs(allPlayers) do
+        local currentPlayerName = string.lower(plyer:Name())
+        if string.StartsWith(currentPlayerName, name)  then
+            table.insert(plyers, plyer)
+        end
+
+        if currentPlayerName == name then
+            return {plyer}
+        end
+    end
+
+    return plyers
+end
+
 -- Define commands here
 local commandsTable = {
     ["kill"] = {
         argsNum = 1,
-        requiresAdmin = true,
+        isAdmin = true,
+        hideMsg = true,
         action = function(ply, args, rest)
             local targetName = args[1]
-            if targetName == nil then
-                ply:Kill()
-            else 
-                local players = player.GetHumans()
-                
-                for i, plyer in ipairs(players) do
-                    if plyer:GetName() == targetName then
-                        plyer:Kill()
-                        break 
-                    end
-                end
-            end
+            if ( !targetName ) then ply:Kill() end
+
+            local plyers = getPlayersByName(targetName)
+
+            if #plyers == 1 then return plyers[1]:Kill() end
+            if #plyers == 0 then return ply:ChatPrint("Could not kill `"..targetName.."`: player not found.") end
+            
+            ply:ChatPrint("Could not kill `"..targetName.."`: several players have a name starting with this prefix.")
         end
     },
+    -- a command to echo a msg
     ["echo"] = {
-        argsNum = 0,
+        -- argsNum = 0 -> it's the default, 
+        -- it means all the content of the message will be in 'rest'
+        hideMsg = true,
         action = function(ply, args, rest)
-            util.AddNetworkString("EchoCommand")
-            // send to the client the message in order to echo it
-            // then on the client side we should manage the connexion
-            net.Start("EchoCommand")
-            net.WriteString(rest)
-            net.Send(ply)
+            if #rest == 0 then return ply:ChatPrint("Cannot echo emptiness.") end
+            ply:ChatPrint("echo: "..rest)
+        end
+    },
+    -- a command to send a msg to all players
+    ["all"] = {
+        hideMsg = true,
+        isAdmin = true,
+        action = function(ply, args, rest)
+            if #rest == 0 then return ply:ChatPrint("Cannot send an empty world message.") end
+            PrintMessage(HUD_PRINTTALK, "-- WORLD MESSAGE -- "..rest)
+        end
+    },
+    -- a command to send a given player
+    ["pm"] = {
+        argsNum = 1,
+        hideMsg = true,
+        action = function(ply, args, rest)
+            local targetName = args[1]
+            if ( !targetName ) then return end
+
+            if targetName == ply:Name() then return ply:ChatPrint("You can't send a pm to yourself.") end
+            if #rest == 0 then return ply:ChatPrint("Cannot send an empty message.") end
+
+            local plyers = getPlayersByName(targetName)
+
+            if #plyers == 1 then
+                local plyer = plyers[1]
+                ply:ChatPrint("PM sent to "..ply:GetName()..": "..rest)
+                plyer:ChatPrint("PM from "..ply:GetName()..": "..rest)
+                return
+            end
+
+            if #plyers == 0 then return ply:ChatPrint("Could not send a pm to `"..targetName.."`: player not found.") end
+            
+            ply:ChatPrint("Could not send a pm to `"..targetName.."`: several players have a name starting with this prefix.")
         end
     }
 }
@@ -44,17 +97,24 @@ local commandsTable = {
 hook.Add("PlayerSay", "InterpretChatCommands", function(ply, msg,_b)
     msg = string.Trim(msg)
 
+    -- if there is a not for several commands with different start patterns
+    -- you should call each commandlist down there
+
     if string.len(msg) <= 1 or not string.StartsWith(msg, commandStartPattern) then
         return
     end
 
     local commands = commands(commandsTable)
 
-    commands:call(ply, msg)
+    -- it's important to return the value if::
+    -- + you want to make use of hideMsg prop
+    -- + you want to make use of the return value of 'action' function
+    -- precision: hideMsg takes priority over action
+    return commands:call(ply, msg)
 end)
 
 -- Setup Commands with an object as displayed up there
-function commands(commandsObject)
+local function commands(commandsObject)
     setmetatable(commandsObject, 
     {
         __index = {
@@ -73,11 +133,17 @@ function commands(commandsObject)
                 local numberOfArgs = command.argsNum and command.argsNum or 0
                 local args, rest = getArgs(argsString, numberOfArgs)
 
-                if command.requiresAdmin and not ply:IsAdmin() then
+                if command.isAdmin and not ply:IsAdmin() then
                     return
                 end
 
-                return command.action(ply, args, rest)
+                local result = command.action(ply, args, rest)
+
+                if command.hideMsg then
+                    return ""
+                end 
+
+                return result
             end,
         }
     })
@@ -87,7 +153,7 @@ end
 
 -- here chatMsg is sure to be a command starting with "!"
 -- Returns a name String and arguments String
-function splitCommand(chatMsg) 
+local function splitCommand(chatMsg) 
     local chatMsg = string.Trim(chatMsg)
 
     local posSpace = string.find(chatMsg, " ")
@@ -108,7 +174,7 @@ end
 
 -- Extract a given number of arguments from an arguments string
 -- Returns the args as an Array and the last argument is the rest of the string
-function getArgs(argsString, number)
+local function getArgs(argsString, number)
     local args = {}
     local rest = argsString
 
