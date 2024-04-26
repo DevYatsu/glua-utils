@@ -1,6 +1,8 @@
 # glua-utils
 
-A set of glua utilities.
+I have recently started to take an interest in garry's mod modding...
+
+I came up with this naive idea, it's just a repository containing a set of glua utilities.
 
 ## Utilities
 
