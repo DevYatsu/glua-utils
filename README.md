@@ -7,7 +7,7 @@ I came up with this naive idea, it's just a repository containing a set of glua 
 ## Utilities
 
 - A simple yet sufficient implementation of glua chat commands parsing: [commands.lua](./commands.lua)
-- More soon...
+- More coming soon...
 
 ## Contributing
 
